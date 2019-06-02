@@ -1,10 +1,11 @@
 /**
  * @file offboard_velocity.cpp
- * @brief Example that demonstrates offboard velocity control in local NED and body coordinates
+ * @brief Example that demonstrates offboard position control in local NED and body coordinates. Based on offboard_velocity.cpp
  *
  * @authors Author: Julian Oes <julian@oes.ch>,
  *                  Shakthi Prashanth <shakthi.prashanth.m@intel.com>
- * @date 2017-10-17
+                    Charles Blouin <charles.blouin@rcbenchmark.com>
+ * @date 2019-06-02
  */
 
 #include <chrono>
@@ -76,38 +77,38 @@ bool offb_ctrl_ned(std::shared_ptr<dronecode_sdk::Offboard> offboard)
     Offboard::Result offboard_result = offboard->start();
     offboard_error_exit(offboard_result, "Offboard start failed");
     offboard_log(offb_mode, "Offboard started");
+    
+    float height = 0.75f;
 
-    offboard_log(offb_mode, "Going to 0, 0, -0.5");
-    offboard->set_position_ned({0.0f, 0.0f, -0.5f, 0.0f});
-    sleep_for(seconds(5)); // Let yaw settle.
-
-    offboard_log(offb_mode, "Going to 0, 0, -0.25");
-    offboard->set_position_ned({0.0f, 0.0f, -0.25f, 0.0f});
+    offboard_log(offb_mode, "Going to 0, 0, -0.0");
+    offboard->set_position_ned({0.0f, 0.0f, -0.0f, 0.0f});
     sleep_for(seconds(1)); // Let yaw settle.
 
+    offboard_log(offb_mode, "Going to 0, 0, -0.75");
+    offboard->set_position_ned({0.0f, 0.0f, -height, 0.0f});
+    sleep_for(seconds(4)); // Let yaw settle.
+    
+    offboard_log(offb_mode, "Going to 0.2, 0, -0.75");
+    offboard->set_position_ned({0.2f, 0.0f, -height, 0.0f});
+    sleep_for(seconds(2)); // Let yaw settle.
+    
+    offboard_log(offb_mode, "Going to 0, 0, -0.75");
+    offboard->set_position_ned({0.0f, 0.0f, -height, 0.0f});
+    sleep_for(seconds(2)); // Let yaw settle.
+
+    // Interpolate for smooth landing
+    const unsigned steps = 5;
+    
+    for (unsigned i = 0; i < steps; ++i) {
+        offboard->set_position_ned({0.0f, 0.0f, -height + height/(float)steps*(float)i + 0.15f, 0.0f});
+        offboard_log(offb_mode, std::to_string(-height + height/(float)steps*(float)i) );
+        sleep_for(milliseconds(400));
+    }
+    
     offboard_log(offb_mode, "Going to 0, 0, 0");
     offboard->set_position_ned({0.0f, 0.0f, 0.0f, 0.0f});
     // sleep_for(seconds(1)); // Let yaw settle.
 
-    /*
-    {
-        const float step_size = 0.01f;
-        const float one_cycle = 2.0f * (float)M_PI;
-        const unsigned steps = 2 * unsigned(one_cycle / step_size);
-
-        offboard_log(offb_mode, "Go North and back South!!!!");
-        for (unsigned i = 0; i < steps; ++i) {
-            float vx = 5.0f * sinf(i * step_size);
-            offboard->set_velocity_ned({vx, 0.0f, 0.0f, 90.0f});
-            sleep_for(milliseconds(10));
-        }
-    }*/
-
-
-    // Now, stop offboard mode.
-    offboard_result = offboard->stop();
-    offboard_error_exit(offboard_result, "Offboard stop failed: ");
-    offboard_log(offb_mode, "Offboard stopped");
 
     return true;
 }
@@ -144,7 +145,7 @@ int main(int argc, char **argv)
                   << NORMAL_CONSOLE_TEXT << std::endl;
         return 1;
     }
-
+    
     // Wait for the system to connect via heartbeat
     while (!dc.is_connected()) {
         std::cout << "Wait for system to connect via heartbeat" << std::endl;
@@ -156,13 +157,26 @@ int main(int argc, char **argv)
     auto action = std::make_shared<Action>(system);
     auto offboard = std::make_shared<Offboard>(system);
     auto telemetry = std::make_shared<Telemetry>(system);
-
+    sleep_for(seconds(1));
+    dronecode_sdk::Telemetry::Health health = telemetry->health();
+    
+    
+    if (health.gyrometer_calibration_ok) {
+        std::cout << "Gyro is calibrated" << std::endl;
+        sleep_for(seconds(1));
+    }
+    
+    /*
     while (!telemetry->health_all_ok()) {
+        dronecode_sdk::Telemetry::Health health = telemetry->health();
+        std::cout << "Gyro: " << health.gyrometer_calibration_ok << std::endl;
+        std::cout << "Local Position: " << health.local_position_ok << std::endl;
+        std::cout << "Home Position: " << health.home_position_ok << std::endl;
         std::cout << "Waiting for system to be ready" << std::endl;
         sleep_for(seconds(1));
     }
     std::cout << "System is ready" << std::endl;
-
+*/
     Action::Result arm_result = action->arm();
     action_error_exit(arm_result, "Arming failed");
     std::cout << "Armed" << std::endl;
@@ -184,7 +198,7 @@ int main(int argc, char **argv)
         sleep_for(seconds(1));
     }
     std::cout << "Landed!" << std::endl;
-
+    action->disarm();
     // We are relying on auto-disarming but let's keep watching the telemetry for a bit longer.
     sleep_for(seconds(3));
     std::cout << "Finished..." << std::endl;

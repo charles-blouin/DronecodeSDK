@@ -58,11 +58,11 @@ Action::Result ActionImpl::arm() const
     }
 
     // Go to LOITER mode first. // For No GPS mode with vision system comment the next 5 lines.
-    ret = action_result_from_command_result(_parent->set_flight_mode(SystemImpl::FlightMode::HOLD));
+    //ret = action_result_from_command_result(_parent->set_flight_mode(SystemImpl::FlightMode::HOLD));
 
-    if (ret != Action::Result::SUCCESS) {
-        return ret;
-    }
+    //if (ret != Action::Result::SUCCESS) {
+    //    return ret;
+    //}
 
     MAVLinkCommands::CommandLong command{};
 
